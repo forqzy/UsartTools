@@ -143,7 +143,8 @@ public class SerialPortTools {
       int len = br.read(data);
       return new String(data, 0, len);
     } catch (IOException e) {
-      JOptionPane.showMessageDialog(null, port.getName() + "数据接收失败::" + e.getLocalizedMessage());
+      JOptionPane.showMessageDialog(null, port.getName() + "数据接收失败::" + e.getLocalizedMessage()+"\r\n确认后会退出!");
+      System.exit(0);
       return "";
     }
   }
@@ -474,7 +475,7 @@ public class SerialPortTools {
       // 设置当通信中断时唤醒中断线程
       port.notifyOnBreakInterrupt(true);
 
-    } catch (TooManyListenersException e) {
+    } catch (Exception e) {
       throw new TooManyListeners();
     }
   }

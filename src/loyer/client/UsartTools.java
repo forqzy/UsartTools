@@ -9,17 +9,13 @@ import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -90,6 +86,7 @@ public class UsartTools {
   private JComboBox<String> stopBitBox;
   private JComboBox<String> dataBitBox;
   private JButton openPort;
+  private JTextField url;
   /** 串口对象 */
   private SerialPort COM1;
   private ArrayList<String> portList = SerialPortTools.findPort();
@@ -146,7 +143,7 @@ public class UsartTools {
       JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
     } // */
 
-    frame = new JFrame("条码上传工具");
+    frame = new JFrame("千手千眼");
     // frame.setResizable(false); //窗口大小不可更改
     frame.setBounds(WIDTH / 4, HEIGHT / 6, WIDTH / 2, HEIGHT * 2 / 3);
     frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -251,7 +248,10 @@ public class UsartTools {
     clearTxButt.addActionListener(e -> {
       txArea.setText("");
     });
-    saveTxButt = new JButton("保存发送数据");
+    saveTxButt = new JButton("生成发送数据");
+    saveTxButt.addActionListener(e -> {
+      txArea.setText("{\"seq\":1,\"id\":5680,\"raw\":[0,0,0],\"pos\":[10,0,0],\"speed\":[0.00,0.00,0.00],\"height\":2.20,\"status\":17}#\r\n");
+    });
     JPanel txButtPanel = new JPanel(new GridLayout(4, 1, 5, 5));
     txButtPanel.add(txStrButt);
     txButtPanel.add(txHexButt);
@@ -283,7 +283,7 @@ public class UsartTools {
     autoTransButt.addActionListener(e -> {
       autoTrans();
     });
-    cycleField = new JTextField("200");
+    cycleField = new JTextField("10");
     cycleField.setHorizontalAlignment(JTextField.CENTER);
     cycleField.setFont(new Font("宋体", Font.PLAIN, 12));
     JPanel cyclePanel = new JPanel(new GridLayout(1, 2));
@@ -297,9 +297,21 @@ public class UsartTools {
     });
     cyclePanel.add(cycleField);
 
-    JButton crcButt = new JButton("CRC校验");
+    JButton crcButt = new JButton("逐行发送");
     crcButt.addActionListener(e -> {
-      txArea.setText(txArea.getText() + " " + SerialPortTools.getCrc(SerialPortTools.toByteArray(txArea.getText())));
+      //txArea.setText(txArea.getText() + " " + SerialPortTools.getCrc(SerialPortTools.toByteArray(txArea.getText())));
+      String txt=txArea.getText();
+      String[] texts =txt.split("#");
+      for (String text : texts) {
+        String tx = text.substring(text.indexOf("{"));
+        post(tx);
+        try {
+          Thread.sleep(Integer.parseInt(cycleField.getText()));
+        } catch (InterruptedException interruptedException) {
+          interruptedException.printStackTrace();
+        }
+      }
+
     });
     
     JCheckBox dtrBox = new JCheckBox("DTR");
@@ -311,12 +323,12 @@ public class UsartTools {
       COM1.setRTS(rtsBox.isSelected());
     });
 
-    botPanel.add(transFileButt);
+ /*   botPanel.add(transFileButt);
     botPanel.add(transDataButt);
-    botPanel.add(autoTransButt);
+    botPanel.add(autoTransButt);*/
     botPanel.add(crcButt);
-    botPanel.add(dtrBox);
-    botPanel.add(rtsBox);
+/*    botPanel.add(dtrBox);
+    botPanel.add(rtsBox);*/
     botPanel.add(cyclePanel);
 
     JPanel txPanel = new JPanel(new BorderLayout(5, 5));
@@ -325,7 +337,7 @@ public class UsartTools {
     txPanel.add(txButtPanel, BorderLayout.WEST);
     txPanel.add(botPanel, BorderLayout.SOUTH);
 
-    JPanel jp = new JPanel(new GridLayout(2, 1, 5, 5));
+    JPanel jp = new JPanel(new GridLayout(1, 1, 5, 5));
     jp.add(rxPanel);
     jp.add(txPanel);
 
@@ -348,21 +360,21 @@ public class UsartTools {
     for (String s : portList) {
       portListBox.addItem(s);
     }
-    baudBox.addItem("9600");
-    baudBox.addItem("2400");
-    baudBox.addItem("19200");
+//    baudBox.addItem("9600");
+//    baudBox.addItem("2400");
+//    baudBox.addItem("19200");
     baudBox.addItem("115200");
     parityBox.addItem("0");
-    parityBox.addItem("1");
-    parityBox.addItem("2");
+//    parityBox.addItem("1");
+//    parityBox.addItem("2");
     stopBitBox.addItem("1");
-    stopBitBox.addItem("0");
-    stopBitBox.addItem("2");
+//    stopBitBox.addItem("0");
+//    stopBitBox.addItem("2");
     dataBitBox.addItem("8");
-    dataBitBox.addItem("5");
-    dataBitBox.addItem("6");
-    dataBitBox.addItem("7");
-    dataBitBox.addItem("9");
+//    dataBitBox.addItem("5");
+//    dataBitBox.addItem("6");
+//    dataBitBox.addItem("7");
+//    dataBitBox.addItem("9");
 
     paramPanel.add(param1);
     paramPanel.add(param2);
@@ -416,8 +428,14 @@ public class UsartTools {
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     rightPane = new JPanel(new BorderLayout(5, 5));
-    rightPane.setBorder(new TitledBorder(new EtchedBorder(), "电机参数设置", TitledBorder.CENTER, TitledBorder.TOP,
+    rightPane.setBorder(new TitledBorder(new EtchedBorder(), "发送参数设置", TitledBorder.CENTER, TitledBorder.TOP,
         new Font("等线", Font.PLAIN, 13), Color.BLACK));
+
+    url= new JTextField();
+    url.setText("http://localhost:7766/location/postx");
+    rightPane.add(url);
+
+
     tabbedPane.addTab("串口工具", leftPane);
     tabbedPane.addTab("位置参数", rightPane);
 
@@ -455,6 +473,86 @@ public class UsartTools {
       } catch (IOException e2) {
         e2.printStackTrace();
       }
+    }
+  }
+
+
+  private void post(String json)
+    {
+      if(json==null || json.trim().length()==0) return;
+      if(!json.trim().startsWith("{"))return;
+      if(!json.trim().endsWith("}"))return;
+
+      String urls = url.getText().trim();
+      if(!urls.endsWith(";")) urls+=";";
+
+      String urlx[]=urls.split(";");
+
+      for (int i = 0; i < urlx.length; i++) {
+        String s = urlx[i];
+        postx(json,s);
+      }
+
+
+    }
+
+  private void postx(String json,String urlstr) {
+    try {
+      // 创建url资源
+      URL url = new URL(urlstr);
+      // 建立http连接
+      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+      // 设置允许输出
+      conn.setDoOutput(true);
+      conn.setDoInput(true);
+
+      // 设置不用缓存
+      conn.setUseCaches(false);
+      // 设置传递方式
+      conn.setRequestMethod("POST");
+      // 设置维持长连接
+      conn.setRequestProperty("Connection", "Keep-Alive");
+      // 设置文件字符集:
+      conn.setRequestProperty("Charset", "UTF-8");
+      //转换为字节数组
+      byte[] data = (json.trim()).getBytes();
+      // 设置文件长度
+      conn.setRequestProperty("Content-Length", String.valueOf(data.length));
+
+      // 设置文件类型:
+      conn.setRequestProperty("Content-Type", "application/json");
+
+
+      // 开始连接请求
+      conn.connect();
+      OutputStream out = conn.getOutputStream();
+      // 写入请求的字符串
+      out.write(data);
+      out.flush();
+      out.close();
+      System.out.println(conn.getResponseCode());
+      // 请求返回的状态
+      if (conn.getResponseCode() == 200) {
+        System.out.println("连接成功");
+        // 请求返回的数据
+        InputStream in = conn.getInputStream();
+        String a = null;
+        try {
+          byte[] data1 = new byte[in.available()];
+          in.read(data1);
+          // 转成字符串
+          a = new String(data1);
+          System.out.println(a);
+        } catch (Exception e1) {
+          // TODO Auto-generated catch block
+          e1.printStackTrace();
+        }
+      } else {
+        System.out.println("no++");
+      }
+
+    } catch (Exception e) {
+e.printStackTrace();
     }
   }
 
@@ -509,9 +607,23 @@ public class UsartTools {
                 rxCountField.setText(count + "");
               } else if (rxStrButt.isSelected()) {
                 String str = SerialPortTools.readString(COM1, "UTF-8");
-                rxArea.append(str);
+
+
+                if(str.trim().startsWith("{") && str.trim().endsWith("}")){
+                  try {
+                    post(str.substring(str.lastIndexOf("{")).trim());
+                  }catch (Exception exp){
+                    exp.printStackTrace();
+                  }
+                }
+
+                rxArea.append(new SimpleDateFormat("yyyyMMdd HH:mm:ss SSS").format(new Date(System.currentTimeMillis()))+":"+str.trim()+"#\r\n");
                 int count = Integer.parseInt(rxCountField.getText()) + str.length();
                 rxCountField.setText(count + "");
+
+
+
+
               }
               break;
             }
