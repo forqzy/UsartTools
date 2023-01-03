@@ -303,12 +303,19 @@ public class UsartTools {
       String txt=txArea.getText();
       String[] texts =txt.split("#");
       for (String text : texts) {
-        String tx = text.substring(text.indexOf("{"));
-        post(tx);
         try {
-          Thread.sleep(Integer.parseInt(cycleField.getText()));
-        } catch (InterruptedException interruptedException) {
-          interruptedException.printStackTrace();
+          String tx = text.substring(text.indexOf("{") + 1);
+          //20221229 11:30:13 482
+          Date date1 = new SimpleDateFormat("yyyyMMdd HH:mm:ss SSS").parse(text.substring(0, text.indexOf("{")).trim());
+          tx="{\"time\":"+date1.getTime()+","+tx;
+          post(tx);
+          try {
+            Thread.sleep(Integer.parseInt(cycleField.getText()));
+          } catch (InterruptedException interruptedException) {
+            interruptedException.printStackTrace();
+          }
+        }catch (Exception ignore){
+
         }
       }
 
